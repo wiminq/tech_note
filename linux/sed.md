@@ -174,7 +174,7 @@ append insert
 `-n 参数`
 	
 pattern space的概念
-
+ 正常即使没有匹配到的行也会显示 即显示两遍
 
 
 ----
@@ -226,3 +226,20 @@ pattern space的概念
 
  这部分好麻烦 参考这里吧 最下面
  http://coolshell.cn/articles/9104.html#comment-592073
+
+	g：将hold space中的内容拷贝到pattern space中，原来pattern space里的内容清除
+	G：将hold space中的内容append到pattern space\n后
+	h：将pattern space中的内容拷贝到hold space中，原来的hold space里的内容被清除
+	H：将pattern space中的内容append到hold space\n后
+	x：交换pattern space和hold space的内容
+
+	sed -e ‘/test/h’ -e ‘$G‘  example：在这个例子里，匹配test的行被找到后，将存入模式空间，h命令将其复制并存入一个称为保持缓存区的特殊缓冲区内。第二条语句的意思是，当到达最后一行后，G命令取出保持缓冲区的行，然后把它放回模式空间中，且追加到现在已经存在于模式空间中的行的末尾。在这个例子中就是追加到最后一行。简单来说，任何包含test的行都被复制并追加到该文件的末尾。
+
+	sed -e ‘/test/h’ -e ‘/check/x’ example：互换模式空间和保持缓冲区的内容。也就是把包含test与check的行互换。
+
+`执行sed脚本：`
+sed -f test.sed
+
+	Sed对于脚本中输入的命令非常挑剔，在命令的末尾不能有任何空白或文本，如果在一行中有多个命令，要用分号分隔。以#开头的行为注释行，且不能跨行。
+
+ps: 去除空白行：sed ‘/^ *$/d’ file
