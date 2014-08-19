@@ -1,0 +1,26 @@
+<form name="optimize_my_cnf" action="optimize_my_cnf.php" method="post" id="optimize_my_cnf" _lpchecked="1">
+<ul type="1"><li>服务器简短主机名： <input name="hostname" size="40" value="yejr" type="text" style="cursor: pointer; background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABHklEQVQ4EaVTO26DQBD1ohQWaS2lg9JybZ+AK7hNwx2oIoVf4UPQ0Lj1FdKktevIpel8AKNUkDcWMxpgSaIEaTVv3sx7uztiTdu2s/98DywOw3Dued4Who/M2aIx5lZV1aEsy0+qiwHELyi+Ytl0PQ69SxAxkWIA4RMRTdNsKE59juMcuZd6xIAFeZ6fGCdJ8kY4y7KAuTRNGd7jyEBXsdOPE3a0QGPsniOnnYMO67LgSQN9T41F2QGrQRRFCwyzoIF2qyBuKKbcOgPXdVeY9rMWgNsjf9ccYesJhk3f5dYT1HX9gR0LLQR30TnjkUEcx2uIuS4RnI+aj6sJR0AM8AaumPaM/rRehyWhXqbFAA9kh3/8/NvHxAYGAsZ/il8IalkCLBfNVAAAAABJRU5ErkJggg==); background-attachment: scroll; background-position: 100% 50%; background-repeat: no-repeat;"></li>
+<li>服务器最大内存： <input name="totalmem" size="4" value="4" type="text"> Gb</li>
+<li>服务器处理器类型：<br><input name="x64" value="1" checked="checked" type="radio"> i686<br><input name="x64" value="0" type="radio"> x86_64
+		</li>
+<li>是否专用MySQL DB 服务器：<br><input name="dedicated" value="1" checked="checked" type="radio"> 是<br><input name="dedicated" value="0" type="radio"> 否</li>
+<li>MySQL 安装文件路径： <input name="basedir" size="40" value="/usr/local/mysql" type="text"></li>
+<li>MySQL 数据文件路径： <input name="datadir" size="40" value="/usr/local/mysql/data" type="text"></li>
+<li>MySQL 监听端口： <input name="port" size="7" value="3306" type="text"></li>
+<li>SOCKET 文件位置： <input name="socket" size="40" value="/tmp/mysql.sock" type="text"></li>
+<li>最多数据表数量： <input name="maxtabs" size="10" value="1024" type="text"></li>
+<li>最大并发连接数： <input name="maxconn" size="10" value="512" type="text"></li>
+<li>排序、分组查询是否较多：<br><input name="freqsort" value="1" checked="checked" type="radio"> 是<br><input name="freqsort" value="0" type="radio"> 否</li>
+<li>主要存储引擎是什么：<br><input name="priengine" value="1" onclick="document.getElementById('eninnodb').style.display='';" checked="checked" type="radio"> InnoDB<br><input name="priengine" value="2" onclick="document.getElementById('eninnodb').style.display='none';" type="radio"> MyISAM<br><input name="priengine" value="3" onclick="document.getElementById('eninnodb').style.display='';" type="radio"> 几乎一半一半</li>
+<div name="eninnodb" id="eninnodb">
+<li>事务可靠性要求级别：<br><input name="trxlevel" value="1" type="radio"> 高<br><input name="trxlevel" value="2" checked="checked" type="radio"> 中<br><input name="trxlevel" value="0" type="radio"> 低</li>
+<li>是否需要采用InnoDB独立表空间：<br><input name="pertbsp" value="1" type="radio"> 是<br><input name="pertbsp" value="0" checked="checked" type="radio"> 否</li>
+</div>
+<li>是否需要开启binlog：<br><input name="binlog" value="1" onclick="document.getElementById('enbinlog').style.display='';" checked="checked" type="radio"> 是<br><input name="binlog" value="0" onclick="document.getElementById('enbinlog').style.display='none';" type="radio"> 否</li>
+<div name="enbinlog" id="enbinlog">
+<li>binlog专用存储目录： <input name="binlogdir" size="40" value="/usr/local/mysql/data" type="text"></li>
+<li>binlog希望最长保留几天： <input name="expbinlog" size="4" value="7" type="text"> 天</li>
+<li>单个binlog文件希望最大尺寸： <input name="maxbinlog" size="7" value="512" type="text"> Mb</li>
+</div>
+<p>		<input name="sub_my_cnf" value="提交" type="submit"><input name="reset" value="取消" type="reset"></p></ul>
+</form>
