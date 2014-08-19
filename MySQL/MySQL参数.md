@@ -52,3 +52,17 @@ innodb_old_blocks_pct
 innodb_max_dirty_pages_pct
 
 
+
+
+----
+
+内存全局参数:
+
+	innodb_buffer_pool_size
+	innodb_additional_mem_pool_size
+	innodb_log_buffer_size
+	innodb_buffer_size
+	sort_buffer_size
+	query_cache_size
+	
+	
