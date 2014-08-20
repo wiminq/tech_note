@@ -1,0 +1,2 @@
+#prompt="(\u:HOSTNAME:)[\d]> "port	= 3306
+/usr/local/mysql
