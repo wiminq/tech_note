@@ -1,0 +1,208 @@
+
+memcached安装配置及使用：
+
+一、安装libevent
+
+memcached依赖于libevent API，因此要事先安装之，项目主页：http://libevent.org/，读者可自行选择需要的版本下载。本文采用的是目前最新版本的源码包libevent-2.0.16-stable.tar.gz。安装过程：
+
+# tar xf libevent-2.0.16-stable.tar.gz
+# cd libevent-2.0.16
+# ./configure
+# make && make install
+
+# echo "/usr/local/lib" > /etc/ld.so.conf.d/usr_local_lib.conf
+# ldconfig 
+
+二、安装配置memcached
+
+1、安装memcached
+# tar xf memcached-1.4.10.tar.gz
+# cd memcached-1.4.10
+# ./configure
+# make && make install
+
+
+2、memcached SysV的startup脚本代码如下所示，将其建立为/etc/init.d/memcached文件：
+
+#!/bin/bash
+#
+# Init file for memcached
+#
+# chkconfig: - 86 14
+# description: Distributed memory caching daemon
+#
+# processname: memcached
+# config: /etc/sysconfig/memcached
+
+. /etc/rc.d/init.d/functions
+
+## Default variables
+PORT="11211"
+USER="nobody"
+MAXCONN="1024"
+CACHESIZE="64"
+OPTIONS=""
+
+RETVAL=0
+prog="/usr/local/bin/memcached"
+desc="Distributed memory caching"
+lockfile="/var/lock/subsys/memcached"
+
+start() {
+        echo -n $"Starting $desc (memcached): "
+        daemon $prog -d -p $PORT -u $USER -c $MAXCONN -m $CACHESIZE $OPTIONS
+        RETVAL=$?
+        echo
+        [ $RETVAL -eq 0 ] && touch $lockfile
+        return $RETVAL
+}
+
+stop() {
+        echo -n $"Shutting down $desc (memcached): "
+        killproc $prog
+        RETVAL=$?
+        echo
+        [ $RETVAL -eq 0 ] && rm -f $lockfile
+        return $RETVAL
+}
+
+restart() {
+        stop
+        start
+}
+
+reload() {
+        echo -n $"Reloading $desc ($prog): "
+        killproc $prog -HUP
+        RETVAL=$?
+        echo
+        return $RETVAL
+}
+
+case "$1" in
+  start)
+        start
+        ;;
+  stop)
+        stop
+        ;;
+  restart)
+        restart
+        ;;
+  condrestart)
+        [ -e $lockfile ] && restart
+        RETVAL=$?
+        ;;       
+  reload)
+        reload
+        ;;
+  status)
+        status $prog
+        RETVAL=$?
+        ;;
+   *)
+        echo $"Usage: $0 {start|stop|restart|condrestart|status}"
+        RETVAL=1
+esac
+
+exit $RETVAL
+
+
+使用如下命令配置memcached成为系统服务：
+# chmod +x /etc/init.d/memcached
+# chkconfig --add memcached
+# service memcached start
+
+3、使用telnet命令测试memcached的使用
+
+# telnet 127.0.0.1 11211
+
+
+add命令：
+add keyname flag  timeout datasize
+如：
+add mykey 0 10 12
+Hello world!
+
+get命令：
+get keyname
+
+
+三、安装Memcache的PHP扩展
+
+①安装PHP的memcache扩展
+
+# tar xf memcache-2.2.5.tgz
+# cd memcache-2.2.5
+/usr/local/php/bin/phpize
+# ./configure --with-php-config=/usr/local/php/bin/php-config --enable-memcache
+# make && make install
+
+上述安装完后会有类似以下的提示：
+
+Installing shared extensions:     /usr/local/php/lib/php/extensions/no-debug-non-zts-20090626/
+
+②编辑/usr/local/php/lib/php.ini，在“动态模块”相关的位置添加如下一行来载入memcache扩展：
+extension=/usr/local/php/lib/php/extensions/no-debug-non-zts-20090626/memcache.so
+
+
+而后对memcached功能进行测试，在网站目录中建立测试页面test.php，添加如下内容：
+<?php
+$mem = new Memcache;
+$mem->connect("127.0.0.1", 11211)  or die("Could not connect");
+
+$version = $memcache->getVersion();
+echo "Server's version: ".$version."<br/>\n";
+
+$mem->set('testkey', 'Hello World', 0, 600) or die("Failed to save data at the memcached server");
+echo "Store data in the cache (data will expire in 600 seconds)<br/>\n";
+
+$get_result = $mem->get('testkey');
+echo "$get_result is from memcached server.";         
+?>
+
+
+如果有输出“Hello World is from memcached.”等信息，则表明memcache已经能够正常工作。
+
+
+四、使用libmemcached的客户端工具:
+
+访问memcached的传统方法是使用基于perl语言开发的Cache::memcached模块，这个模块在大多数perl代码中都能良好的工作，但也有着众所周知的性能方面的问题。libMemcached则是基于C语言开发的开源的C/C++代码访问memcached的库文件，同时，它还提供了数个可以远程使用的memcached管理工具，如memcat, memping，memstat，memslap等。
+
+1) 编译安装libmemcached
+
+# tar xf libmemcached-1.0.2.tar.gz 
+# cd libmemcached-1.0.2
+# ./configure 
+# make && make install
+# ldconfig
+
+2) 客户端工具
+# memcat --servers=127.0.0.1:11211 mykey
+# memping 
+# memslap
+# memstat
+
+
+五、Nginx整合memcached:
+
+server {
+        listen       80;
+        server_name  www.magedu.com;
+
+        #charset koi8-r;
+
+        #access_log  logs/host.access.log  main;
+
+        location / {
+                set $memcached_key $uri;
+                memcached_pass     127.0.0.1:11211;
+                default_type       text/html;
+                error_page         404 @fallback;
+        }
+
+        location @fallback {
+                proxy_pass http://172.16.0.1;
+        }
+}
+
