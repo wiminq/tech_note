@@ -1,0 +1,70 @@
+tomcat install
+
+cd /usr/local
+chmod +x jdk-6u25-ea-bin-b03-linux-i586-27_feb_2011.bin
+./jdk-6u25-ea-bin-b03-linux-i586-27_feb_2011.bin
+
+#ln -s jdk1.6.0_25/  java
+#ln -s apache-tomcat-7.0.11 tomcat
+
+
+vim /etc/profile
+
+#export JAVA_HOME=/usr/local/java
+#export TOMCAT_HOME=/usr/local/tomcat
+#export BASE_HOME=/usr/local/tomcat
+
+
+export JAVA_HOME=/usr/local/jdk1.6.0_25
+export TOMCAT_HOME=/usr/local/apache-tomcat-7.0.11
+
+
+
+source /etc/profile
+
+ tar xvf commons-daemon-native.tar.gz 
+  cd commons-daemon-1.0.5-native-src/unix
+  ./configure 
+  export JAVA_HOME=/usr/local/jdk/
+ ./configure 
+  make
+
+cp jsvc ../..
+
+cd ../..
+chmod +x *.sh
+
+cp /usr/local/tomcat/bin/catalina.sh /etc/init.d/tomcat
+cp /usr/local/apache-tomcat-7.0.11/bin/catalina.sh /etc/init.d/tomcat
+
+
+chmod +x /etc/init.d/tomcat
+vim /etc/init.d/tomcat
+
+#chkconfig: 2345 63 37
+#description:tomcat server 
+JAVA_HOME=/usr/local/java
+CATALINA_HOME=/usr/local/apache-tomcat-7.0.11
+
+JAVA_HOME=/usr/local/jdk1.6.0_25
+TOMCAT_HOME=/usr/local/apache-tomcat-7.0.11
+
+
+chkconfig --add tomcat
+chkconfig tomcat on
+
+chmod +x /etc/init.d/tomcat
+
+
+#JAVA_HOME=/usr/local/jdk1.6.0_25
+#./bin/jsvc -cp ./bin/bootstrap.jar -outfile ./logs/catalina.out -errfile ./logs/catalina.err org.apache.catalina.startup.Bootstrap
+
+
+service tomcat start
+
+
+vim conf/server.xml  ///tomcat配置文件，默认端口号8080
+<Connector port="8090" protocol="HTTP/1.1" 
+               connectionTimeout="20000" 
+               redirectPort="8443" URIEncoding="UTF-8"/>
+

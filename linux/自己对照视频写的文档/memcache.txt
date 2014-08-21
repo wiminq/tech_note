@@ -1,0 +1,108 @@
+我们常提到Memcached是服务端主程序文件，服务端安装程序。
+
+　　为了让你的程序飞起来，必须安装memcached服务端程序和PHP的Memcached扩展，所以如果您要使用Memcache来缓存系统，memcache和memcached两样我们都需要安装。
+
+　　安装memcache
+# cd /usr/local/src
+# wget http://pecl.php.net/get/memcache-2.2.5.tgz
+# gzip -d memcache-2.2.5.tgz
+# tar xvf memcache-2.2.5.tar
+# cd memcache-2.2.5
+
+　　以下几句，是以php所在目录为/usr/local/php为例，如果您的php有变化，请自行替换几句中/usr/local/php的部分
+# /usr/local/php/bin/phpize
+# ./configure --enable-memcache --with-php-config=/usr/local/php/bin/php-config --with-zlib-dir
+# make && make install
+ 
+
+　　将memcache加入php扩展
+
+　　# vi /etc/php.ini(/etc/php.ini地址为我的php.ini位置，如果你不知道你的php.ini在哪里，可以用# find / -name php.ini进行查找，或者传个探针phpinfo，找到Configuration File (php.ini) Path)中php.ini的位置.
+
+　　末尾加入
+
+　　按键盘上的 i 开始编辑
+
+　　CTRL+F翻页拉到最下面在[Zend]之前加入
+extension_dir = "/usr/local/php/lib/php/extensions/no-debug-non-zts-20060613/"
+extension=memcache.so
+ 
+
+　　按Esc键，再输入
+
+　　：wq
+
+　　保存退出
+
+　　重启你的web服务器，比如apache
+/etc/init.d/httpd restart
+ 
+
+　　下面刷新下PHP探针，看下是不是有这个了，有的话就是装好了
+memcache
+Version  2.2.5memcache
+Version  2.2.5
+下面安装memcached
+
+　　装memcached首先需要安装安装libevent
+
+　　如果是centos可以yum安装
+# yum install libevent-devel
+ 
+
+如果不支持yum的系统，可以这样装libevent
+# cd /usr/local/src
+# wget http://www.monkey.org/~provos/libevent-1.4.12-stable.tar.gz
+# tar vxf libevent-1.4.12-stable.tar.gz
+# cd libevent-1.4.12
+# ./configure --prefix=/usr/local/libevent
+# make && make install
+
+ 
+
+接续安装memcached
+# cd /usr/local/src
+# wget http://cloud.github.com/downloads/saberma/saberma.github.com/memcached-1.4.4.tar.gz
+# tar vxf memcached-1.4.4.tar.gz
+# cd memcached-1.4.4
+# ./configure --prefix=/usr/local/memcached
+# make && make install
+
+ 
+
+安装完后启动memcached并分配32m内存（32为使用内存数，可按自身情况修改）
+/usr/local/memcached/bin/memcached -d -m 32 -l 127.0.0.1 -p 11211 -u root
+
+将memcached加入启动项
+# vi /etc/rc.d/rc.local
+
+ 
+
+按键盘上的 i 开始编辑
+
+在最后加入
+
+/usr/local/memcached/bin/memcached -d -m 32 -l 127.0.0.1 -p 11211 -u root
+
+ 
+
+按Esc键，再输入
+
+：wq
+
+保存退出
+
+如果需要，可以reboot一下，不过不用reboot应该已经生效~
+
+加速效果测试
+
+用没有什么负载的Discuz X1做个测试，未启用时
+GMT+8, 2010-9-12 09:08, Processed in 0.038893 second(s), 2 queries.
+ 
+
+缓存启用后的效果，不过总体感觉VPS上效果不如用eAccelerato缓存加入效果那么明显
+
+GMT+8, 2010-9-12 09:08, Processed in 0.008383 second(s), 2 queries, Memcache On.
+ 
+
+大功告成，打完收工！~~

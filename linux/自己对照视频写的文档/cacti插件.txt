@@ -1,0 +1,161 @@
+Cacti安装插件：email，msn，fetion报警（转载） 
+2011-03-08 22:21:51
+标签：系统监控 Cacti msn email fetion报警 
+Cacti版本：cacti 0.8.7g
+对应的PA 版本：PA 2.8
+要安装别的插件前,先要安装cacti的一个patch－－Plugin Architecture,才能支持插件
+PA 2.8 = cacti 0.8.7g
+[root@station1~]# wget http://mirror.cactiusers.org/downloads/plugins/cacti-plugin-0.8.7g-PA-v2.8.zip
+[root@station1~]# unzip cacti-plugin-0.8.7g-PA-v2.8.zip
+[root@station1~]# cp -R cacti-plugin-arch/* /var/www/html/cacti/
+[root@station1~]# cd /var/www/html/cacti/
+[root@station1 cacti]# mysql -ucacti -pcacti cacti <pa.sql
+[root@station1 cacti]# patch -p1 -N <cacti-plugin-0.8.7g-PA-v2.8.diff
+[root@station1 cacti]# vi /var/www/html/cacti/include/config.php
+/* Default database settings*/
+$database_type = "mysql";
+$database_default = "cacti";
+$database_hostname = "localhost";
+$database_username = "cacti";
+$database_password = "cacti";
+$database_port = "3306";
+$url_path = “/cacti/”;
+之后可能会出现禁止访问的警告
+最终确定是selinux的问题。可以使用chcon -R –reference /var/www/html /var/www/html/cacti
+也可以关闭selinux，重启就OK了。
+授权admin用户"plugin Management"：
+登录后，Utilities–User Management–admin—Realm Permissions，选中“Plugin Management"，Save。
+安装monitor、thold、settings 插件
+[root@station1~]# wget http://docs.cacti.net/_media/plugin:monitor-latest.tgz
+[root@station1 ~]# wget http://docs.cacti.net/_media/plugin:thold-latest.tgz
+[root@station1~]# wget http://docs.cacti.net/_media/plugin:settings-latest.tgz
+[root@station1 ~]# tar zxvf monitor-latest.tgz
+[root@station1 ~]# tar zxvf settings-latest.tgz
+[root@station1 ~]# tar zxvf thold-latest.tgz
+[root@station1 ~]# mv monitor-0.9/ /var/www/cacti/plugins/monitor
+[root@station1 ~]# mv settings-0.6/ /var/www/cacti/plugins/settings
+[root@station1 ~]# mv thold-0.41/ /var/www/cacti/plugins/thold
+现在去安装,见下图:
+
+注意： 1.官方文档说要修改/var/www/html/cacti/include/global.php  里面的内容。我试验后发现，修改后反而不能找到插件。不修改即可找到插件。 2.在安装thold是，可能会出现 You are missing a dependency for thold, please install the 'Settings' plugin. 这样的警告。只需要先安装settings插件就OK。 3.MSN报警 1.去下载 （SendMsg）下载地址： http://downloads.fanatic.net.nz/dev/php/sendMsg.zip 然后解压，放在目录/var/www/html/sendMsg 然后通过web访问，输入sender和rcpiter，都能收到信息，那么说明正常。 见图：
+
+2.修改cacti插件thold目录下的thold_functions.php
+我这里是/var/www/html/cacti/plugins/thold
+搜thold_mail找到文件中的第一个这一句 ：
+if (trim($alert_emails) != "")
+thold_mail($alert_emails, '', $subject, $msg, $file_array);
+然后下面添加
+exec("echo $subject >>/var/www/html/cacti/plugins/thold/alert.log");
+exec("sh /var/www/html/cacti/plugins/thold/sendmessage.sh");
+保存退出
+3.然后编写个sendmessage.sh脚本，在/var/www/html/cacti/plugins/thold/这个目录下
+脚本内容
+===============================================================================
+#!/bin/sh
+echo `echo -n "date:"&&date +%Y-%m-%d-%H:%M` >> /var/www/html/sendMsg/msn.txt.1
+cat /var/www/html/cacti/plugins/thold/alert.log >>/var/www/html/sendMsg/msn.txt.1
+now=`date +%Y-%m-%d-%H:%M`
+SA=(test)
+msnaddr=(pingsun2010@hotmail.com)
+sendMsg()
+{
+num=0
+while [ $num -lt 1 ];
+do
+wget —post-data "sender=pingsun2012@hotmail.com&password=123456&recipient=${1}&message=${2}" http://127.0.0.1/sendMsg/index.php -O /var/www/html/sendMsg/index.php.1 >/dev/null 2>&1
+if [ -f /var/www/html/sendMsg/index.php.1 ]; then
+if cat /var/www/html/sendMsg/index.php.1 |grep -i successfully >/dev/null 2>&1;then
+num=1
+elif cat /var/www/html/sendMsg/index.php.1 |grep -i "The user appears to be offline" >/dev/null 2>&1;then
+num=1
+echo "The user is offline."
+exit 0
+elif cat /var/www/html/sendMsg/index.php.1 |grep -i "Something went wrong trying to connect to the server" >/dev/null 2>&1;then
+num=1
+echo "MSN server is online."
+exit 0
+else
+num=0
+fi
+rm -f /var/www/html/sendMsg/index.php.1
+else
+num=0
+fi
+done
+}
+mv /var/www/html/sendMsg/msn.txt /var/www/html/sendMsg/bak/msn$now.txt -f 1>/dev/null 2>&1
+mv /var/www/html/sendMsg/msn.txt.1 /var/www/html/sendMsg/msn.txt -f 1>/dev/null 2>&1
+rm /var/www/html/cacti/plugins/thold/alert.log -f 1>/dev/null 2>&1
+for i in 0
+do
+if cat /var/www/html/sendMsg/msn.txt ; then
+messages=`cat /var/www/html/sendMsg/msn.txt `
+sendMsg "${msnaddr[$i]}" "$messages"
+else
+continue
+fi
+done
+===========================================================
+然后保存退出。(发送和接受者必须互为好友)
+4.手动运行sendmessage.sh这个脚本，如果没有问题，应该可以收到消息。
+4.飞信报警功能实现
+1.下载最新版飞信机器人。
+http://bbs.it-adv.net/viewthread.php?tid=1081&extra=page%3D1
+根据情况下载，因为会经常更新。 下载两个一个是fetion程序，一个是Linux下的库包linuxso-20101113.tar.gz
+2.飞信机器人放置位置
+Cd /var/www/html
+Mkdir sendsms
+Cp linuxso_20101113 /var/www/html/sendsms/linuxso
+Cp fetion /var/www/html/sendsms/linuxso/fetion
+Chmod 777 -R  /var/www/html/sendsms/linuxso
+搜thold_mail找到文件中的第一个这一句 ：
+if (trim($alert_emails) != "")
+thold_mail($alert_emails, '', $subject, $msg, $file_array);
+然后下面添加
+exec("echo $subject >>/var/www/html/cacti/plugins/thold/alert.log");
+exec("/var/www/html/cacti/plugins/thold/sendsms.sh");
+编写sendsms.sh脚本，内容如下：
+===========================================================================
+#!/bin/sh
+#send sms by fetion
+#Write by pingsun2010@hotmail.com
+if [ ! -e "/var/www/html/cacti/plugins/thold/alert.log" ];then
+echo "Usage:alert.log does not exist"
+exit
+fi
+if [ -n "`cat /var/www/html/cacti/plugins/thold/alert.log`" ]; then
+admin="150382XXXX"
+echo "sms $admin "`cat /var/www/html/cacti/plugins/thold/alert.log` >>/var/www/html/cacti/plugins/thold/sms.txt
+echo "exit" >> /var/www/html/cacti/plugins/thold/sms.txt
+else
+echo "Usage:no alert"
+exit
+fi
+if [ -n "`cat /var/www/html/cacti/plugins/thold/sms.txt`" ] ; then
+LD_LIBRARY_PATH=/var/www/html/sendsms/linuxso /var/www/html/sendsms/linuxso/fetion --mobile=158038XXX90 --pwd=123xxx --to=$admin --file-utf8=/var/www/html/cacti/plugins/thold/sms.txt
+rm -f /var/www/html/cacti/plugins/thold/sms.txt 1>/dev/null 2>&1
+rm -f /var/www/html/cacti/plugins/thold/alert.log 1>/dev/null 2>&1
+else
+echo "Usgae:no message to send"
+exit
+fi
+=====================================================================
+保存，退出。测试一下。
+可以新建alert.log以及sms.txt,其中在alert.log中添加一个内容。
+然后运行脚本
+./sendsms.sh
+会返回以下结果，表示成功。 同时对方收到短信。
+[root@station1 thold]# ./sendsms.sh
+图形验证码已经生成，文件名为:15803826990.jpg请识别后输入图形验证码:
+Nm8p     #一般第一次会让你输入验证码。这个图片，在你的fetion的目录下。
+您输入的识别码是:nm8p
+SIP-C/4.0 280 Send SMS OK
+T: sip:759885962@fetion.com.cn;p=9283
+I: 3
+Q: 1 M
+L: 115
+D: Mon, 22 Nov 2010 15:28:45 GMT
+XI: 516723D0200B5C60F8747A8E9B4CFF55
+
+OK，成功发送飞信，此时你的手机便可以接收到飞信。
+

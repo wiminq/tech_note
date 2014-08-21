@@ -1,0 +1,209 @@
+awk命令详解
+2009年03月31日 星期二 22:22
+AWK指令详解
+
+1. 命令简述：
+
+awk将每个输入行识别成一条记录，而将那一行上的每个单词域识别成一个字段
+
+2. 命令选项：
+     -F                指定分隔符
+     NF                单行最后一个分段
+     NR                行数
+     && 等同 AND       语句两边必须同时匹配为真
+     || 等同 OR        语句两边同时或其中一边匹配为真。
+     !                 求逆
+     ARGC              支持命令行中传入awk脚本的参数个数。
+     ARGVARGC          参数排列数组，其中每一元素表示为ARGV[n]，n为期望访问的命令行参数。
+     ENVIRON           支持系统设置的环境变量，例如ENVIRON[“EDITOR”] =“Vi”
+     FILENAME          支持a w k脚本实际操作的输入文件
+     FNR               支持a w k目前操作的记录数。其变量值小于等于N R。
+     FS                用来在a w k中设置域分隔符，与命令行中- F选项功能相同，例:F S = "，"
+     NF                支持记录域个数，在记录被读之后再设置
+     OFS               允许指定输出域分隔符，缺省为空格。如果想设置为#，写入O F S = " # "
+     ORS               为输出记录分隔符，缺省为新行（ \ n）
+     RS                记录分隔符，缺省为新行( \ n )
+     gsub(r,s)         在整个$ 0中用s替代r,r为原内容,s为新内容,r可为/正则/
+     gsub（r,s,t)      在整个t中用s替代r, r为原内容,s为新内容,r可为/正则/
+     index(s,t)        返回s中字符串t的第一位置
+     length(s)         返回s长度
+     match(s,r)        测试s是否包含匹配r的字符串
+     split(s,a,fs)     以fs为分隔符将s分成序列数组a
+     sprint(fmt,exp)   返回经f m t格式化后的e x p
+     sub(r,s)          将$ 0第一个r替换为s ,r可为/正则/
+     sub(r,s,t)        将域t中的第一个r替换为s ,r可为/正则/
+     substr(s,p)       返回字符串s中从p开始的后缀部分
+     substr(s,p,n)     返回字符串s中从p开始长度为n的后缀部分
+     rand()            产生0到1之间的符点小数
+     Printf()
+          -        左对齐
+          width    域的步长，用0表示0步长
+          . prec   最大字符串长度，或小数点右边的位数
+          %c       ASCII字符
+          %d       整数
+          %e       浮点数，科学记数法
+          %f       浮点数，例如（1 2 3 . 4 4）
+          %g       awk决定使用哪种浮点数转换e或者f
+          %o       八进制数
+          %s       字符串
+          %x       十六进制数
+3. 引用文件list.txt：
+
+          54786542:13744232156
+          360565687:15026736523
+          360565687:13597572727
+          100000:13898754555
+          100000:13898754555
+          1510121:155554215544:TTTa
+          baoping 207
+          1986 2009
+          1986 2007
+          baoping 2007
+          Malist
+          dj121M112d12nmm
+          tete
+4. 实例说明：
+     awk '/^/' list.txt      匹配包含^的行,即显示全文
+     awk '/$/' list.txt      匹配包含$的行,即显示全文
+
+     awk '/./' list.txt      匹配包含^的行,即显示全文
+
+     awk '/.*/' list.txt     匹配包含任意字符的行,即显示全文
+     awk '{ print $1 }' list.txt    显示list.txt中每行第一串字符串
+
+     awk '/M/' list.txt    显示包含字符M所有的行
+
+     awk '/M/ { print $1 }' list.txt   显示包含M的行的第一串字符串
+
+     awk '/M/ {print "TT",$1}' list.txt   匹配包含M前面添加显示TT空格
+
+     awk -F, '{ print $1; print $2}' list.txt   逗号为分隔符,无第二串则换行
+
+     awk '{print NF}' list.txt 显示默认分隔符最后一个分段$数置
+
+     awk '{print $NF}' list.txt    显示最后一分段的值
+
+     awk '{n++}END{print n" line"}' list.txt 统计文本内容行数
+
+     awk -F: '{if($2~/15026736523/) print $0}' list.txt 匹配第二域,并显示该记录
+
+     awk '$0!~/15026736523/' list.txt   不匹配并显示该记录
+
+     awk '$0 ~ /15026736523/ {print $0 }' list.txt   匹配手机号,并显示该记录
+
+     awk -F: '$2=="15026736523" {print $0 }' list.txt   精确匹配$2的值
+
+     awk -F: '{if($2=="15026736523")print $0}' list.txt   精确匹配$2的值
+
+     awk -F: '{if($1 < $2) print $0}' list.txt   判断$1小于$2的记录并print
+
+     awk '/[Mm].*/' list.txt    匹配M.*或者m.*
+
+     awk -F: '$1 ~ /^…i/ {print $0}'list.txt   匹配第四个字符为i的行并显示
+
+     awk -F: '$1 ~ /(360|332)/ {print $0}'list.txt 匹配360和332的行.效果同[]
+
+     awk -F: '$1=="360565687" && $2=="15026736523"' list.txt 同时要符合条件,交集
+
+     awk -F: '{if ($1~/360/ || $2 ~/150/)print $0}' list.txt 匹配任何一个,并集
+
+     awk '{if (NR>0 && $1~/3605656/)print $0}' list.txt 匹配if条件
+
+     awk 'BEGIN{var="200"} {if ($1<var) print $0}' list.txt 利用begin赋值
+
+     awk '{if($1=="baoping"){$2=$2+1};print $2}' list.txt 算术运算
+
+     awk '{if($1=="baoping") $2="1986";print $2}' list.txt 重新赋值并显示所有$2
+
+     awk '{if($1=="baoping") {$2="1986";print $2}}' list.txt 重新赋值并显示单个$2
+
+     awk 'BEGIN{print "To"}{if($1<$2) {$2=$2-$1;print $0}}' list.txt   结果1986 23
+
+     awk '{(tot+=$2)}; END{print "total number:" tot}' list.txt 计算所有$2列的和
+
+     ls -l | awk '/^[^d]/ {print $9"\t"$5} {tot+=$5} END {print "KB:" tot}' 大小和
+
+     awk 'gsub("2007","2009",$0){print $0}' list.txt   将2007改为2009并显示
+
+     awk 'BEGIN {print index("150","5")}'    显示2,数所在的位数
+     awk '$1=="baoping" {print length($1)" "$1}' list.txt 显示结果7 baoping,字符长度
+
+     awk '$1=="baoping" {print match($2,"7")}' list.txt 相同字符首位置,本例4
+
+     awk 'BEGIN {print split("1#2#3#4",shuzu,"#")}' 结果为数组有4个元素shuzu[]
+
+     echo az bg cde|awk '{sub(/[ab]/,"g",$2);print $2}' sub用正则表达式替换,结果gg
+
+     awk -F"[ :]" '{ print $1 }' list.txt   同时使用两个分隔符
+
+     awk '$1=="1986" {print substr($2,1,3)}' list.txt   显示匹配的$2从1后3个字符
+
+     awk '{print substr($1,3)}' list.txt   显示每行第3字符后的字符
+
+     awk 'BEGIN{STR="hello"}END{print substr(STR,4)}' list.txt 从第四位开始即lo
+
+     echo "Stand-by" | awk '{print length($0)}' 统计变量字符个数
+
+     STR="mydoc.txt"; echo $STR|awk '{print substr($STR,1,5)}' 结果mydoc
+
+     echo "65" | awk '{printf "%c\n",$0}' 以ASCII码显示65即A
+
+     awk 'BEGIN{printf "%c\n",65}' 以ASCII码显示65
+
+     awk 'BEGIN{printf "%f\n",999}'   以符点数显示结果999.000000
+     awk -F"[: ]" '{printf "%-15s %s\n",$1,$2}' list.txt $1与$2分别1 5个字符长度
+
+     awk '{if ($1<QQ) print $0}' QQ=360565687 list.txt   传递参数给awk使用
+     awk 'BEGIN{QQ=360565687}{if ($1<QQ) print $0}' list.txt   传递参数给awk使用
+     awk 'BEGIN{FS=":"}{print $1,"\t",$2}' list.txt   此方式必须在begin指定分隔符
+     awk 'NF!=MAX{print("line "NR" does not "MAX"")}' MAX=2 list.txt 如域数不等于2则显示，C风格
+     awk 'BEGIN{print (1+2.5)*3}'    结果10.5,shell不能比较浮点数
+
+     awk 'BEGIN {split("123#456#789",my,"#");print my[1]}'   此时my[1]为第一个元素
+     awk -F: '{a[$1]=a[$1]"\n"$2;v[$1]++}END{for ( i in a )print "["i"]",v[i],a[i]}' qq.txt
+
+                                                               //显示数组中的key其中i即key
+    awk '{for(i=1;i<100;i++){if($i ~/UN=/){print $2"\t"substr($5,2)" "$8" "$i}}}' kkk.txt
+
+                                                               //使用标准风格的for语句
+
+     awk 'a=0;{for(i=1;i<=NF;i++)a+=$i;b=a/NF;print b}' 1.txt //求a.txt每行的平均值
+     awk '{for(i=1;i<=NF;i++)a[i]+=$i}{if(NR==3){for(i=1;i<=NF;i++){print a[i]/NR}}}' 1.txt
+	 
+	 
+	 
+	 awk 求和
+	 
+	 在Shell中，我们可以用awk实现按列求和的功能，非常简单。看下面的例子：
+ 1.简单的按列求和
+ [linux@test /tmp]$ cat test
+ 123.52
+ 125.54
+ 126.36
+ [linux@test /tmp]$ awk '{sum += $1};END {print sum}' test
+ 375.42
+ 2.对符合某些条件的行，按列求和
+ [linux@test /tmp]$ cat test
+ aaa 123.52
+ bbb 125.54
+ aaa 123.52
+ aaa 123.52
+ ccc 126.36
+ 对文件test中 第一列为aaa的行求和
+ [linux@test /tmp]$ awk '/aaa/ {sum += $2};END {print sum}' test
+ 370.56
+ awk 处理文本还是很方便的。 
+ # cat lastlog 
+ 1008520650 天津 http://www.aibang.com/abc/a.jpg 0.015
+ 1008522118 天津 http://www.aibang.com/abc/a.jpg 0.015
+ 1008520646 天津 http://www.aibang.com/abc/a.jpg 0.015
+ 1999853994 沈阳 http://www.aibang.com/abc/a.jpg 0.015
+ 1008520650 天津 http://www.aibang.com/abc/a.jpg 0.015
+ 1008522118 天津 http://adad.ada.con/da 0.018
+ 1008520646 天津 http://adadad/dad/dd.abc 0.016
+ 1999853994 沈阳 http://www.sohu.com/abc/d.jif 1.14
+
+ # cat lastlog|grep "天津"|awk '{print$NF}' |awk '{sum += $1};END{print sum}'
+ 0.094
+ 我的NF是最后一个字段
+ #awk '/天津/{sum += $NF};END {print sum}' lastlog
