@@ -1,0 +1,419 @@
+一、导言
+
+1、cacti简介
+Cacti是基于PHP/MySQL的开源网络监控及绘图工具，它通过SNMP获取数据并使用RRDTool予以存储，然后在需要时利用RRDTool绘图引擎绘图并通过php展示。其作者为Ian Berry，其在使用RRDTool绘图时发现rrdtool绘图的能力相当强大，但缺少一个易用的接口，于是萌发了开发Cacti的想法。
+
+Cacti的操作流程很简单：获取数据-->存储数据-->展示数据。Cacti通过poller获取数据。poller是一个通过调度的方式每隔一段时间(通常为5分钟)执行的程序，它通常通过SNMP来获取远程主机上的数据。
+
+2、RRDTool：
+
+2.1  RRDTool简介
+
+RRDTool是一个高性能的数据记录及绘图工具，主要用于处理时间序列数据比如网络带宽、房间温度、CPU负载、服务器负载及对其它网络设备进行监控的数据等。它能让管理记录和分析通过SNMP从其它任意数据源 (Data Source) 获取到的时间序列数据，并能将这些数据以图形化的方式予以展示。RRDTool记录数据的文件名后缀通常为.rrd，而且其能够存储的数据的总量不会改变。因为当文件写满之后，新生成的数据会覆盖当前文件中最早生成的数据。其作者为Tobi Oeticker。
+
+RRDTool提供了几个子命令实现对.rrd文件的管理，如create, update, updatev, graph, dump, restore, fetch, tune, last, info, rrdresize, xport, flushcached和rrdcgi等。有此开发语言直接内嵌了RRDTool，如PHP, tcl, Perl, Python等。
+
+RRDTool只能绘制线条或区域形图，也可以是两者的综合。一般说来，RRDTool能绘制以下四种类型的图形：
+	LINE: 线条
+	VRULE: 垂线
+	HRULE: 水平线
+	AREA： 区域
+	
+	
+2.2 使用RRDTool绘图的步骤：
+	a、使用rrdtool create命令创建一个新的RRD数据文件；
+	b、使用rrdtool update为前面创建的RRD数据文件提供数据；此数据需要周期性的进行更新，因此，应该将rrdtool update创建为cron任务；
+	c、使用rrdtool graph从RRD数据文件中获取数据并绘图；
+
+
+2.3 rrdtool create命令的用法：
+
+语法：
+rrdtool create filename [--start|-b start time] [--step|-s step] [--no-overwrite] [DS:ds-name:DST:dst arguments] [RRA:CF:cf arguments]
+
+此命令用于创建初始的RRD数据文件，创建完成后文件大小为其最终大小，里面初始数据以*UNKNOWN*进行填充；文件名通常以.rrd结尾。
+
+--start|-b start time (default: now - 10s)：      用于指定开始向文件中记录数据的起始时间，此时间为1970年1月1日起至指定起始时间所经过的秒数；这里不接受已经过去的时间。
+
+--step|-s step (default: 300 seconds)： 记录数据的时间间隔；
+
+--no-overwrite：不覆盖一个已经存在的rrd数据文件；
+
+DS:ds-name:DST:dst arguments
+
+DS: 用于指定向此rrd文件记录数据的数据源(Data Source)。一个RRD文件可以接受多个不同的数据源的数据，如某主机某网卡的入站数据流量和出站数据流量等。
+ds-name: 当前数据源的名称(以便在其它地方引用)。数据源的名称长度不能超过19个字符，而且只能包含字母和数字。
+DST: Data Source Type，即数据源类型。RRDTool中的数据源类型有GAUGE, COUNTER, DERIVEA, ABSOLUTE和COMPUTE等。
+	前四种的用法格式为：DS:ds-name:GAUGE | COUNTER | DERIVE | ABSOLUTE:heartbeat:min:max
+	COMPUTE的用法格式为：DS:ds-name:COMPUTE:rpn-expression
+heartbeat：在指定的更新时间间隔到达时，rrd文件期望接收到新的数据。而由于各种原因，更新数据的到达时间可能会有误差。此处的heartbeat则用于指定此RRD文件所能够接受的更新数据最长到达时间长度。
+min和max: 用于此RRD文件为当前数据源产生的数据指定一个接受范围，max为其上限，min为其下限。而超出此范围的数据都被标识为*UNKNOWN*。在为某数据源指定上限和下限时，通常用其理论上的最大值和最小值。
+		
+RRA:CF:cf arguments
+RRD文件的目的之一就是存储RRA(Round Robin Archives)数据。对一个数据源来说，一个archive通常由一系列的数值或统计值组成。在RRD文件中，每个RRA是分开存储的，因此每个RRA都需要专门进行定义。每当一个更新数据被记入RRD文件时，其都会被查找一个与之对应的“时间点”处，此即为一个PDP(Primary Data Point)。同时，这些数据会被RRA中定义的统计函数(Consolidation Function)进行处理后再进行记录。CF就是用于指定对数据进行处理的统计函数，它们包括AVERAGE、MIN、MAX和LAST。当然，通过这些函数计算过的数据可能会丢失一部分精度或信息。
+RRA一行详细的语法格式为RRA:AVERAGE | MIN | MAX | LAST:xff:steps:rows
+其中xff为xfiles factor，用来定义当PDP的数据为*UNKNOWN*的部分小于多大百分比时，统计的结果仍然可以标记为某具体值。因此，xff取值范围为0到1之间的任意值。
+steps用于定义有多少PDP用于CF进行汇总并记入RRD文件中；rows用记定义每一个RRA中共保存多少个生成的数据记录。
+
+关于DST的详细说明：
+GAUGE：这是最常用的DST，即某指标当前的直接值，而不用再经过rrdtool解析；
+COUNTER: 计数器，需要持续性递增类的数值，比如经由某网卡所传输的字节数；如果计数器发生溢出，RRDTool会试图猜测出其正确的值。
+DERIVE：类似COUNTER，但不对其值作溢出与否的检查和猜测。
+ABSOLUTE: 类似COUNTER，但每次计数都将计数器清零后直接计数。
+COMPUTE: 用于记录将本RRD中其它数据源中的数据经过某表达式处理后的数据。
+
+2.4 rrdtool update用法
+
+rrdtool {update | updatev} filename [--template|-t ds-name[:ds-name]...] [--daemon address] [--] N|timestamp:value[:value...] at-timestamp@value[:value...] [timestamp:value[:value...] ...]
+
+rrdtool update用于向RRD文件提供时间序列数据。updatev是update的增强版，其中v表示verbose，其通返回值比update更丰富和详细。
+
+2.4.1 语法解析
+
+filename：要更新的RRD文件
+--template|-t ds-name[:ds-name]...: 默认情况下，除了COMPUTE类型的外，update期望其接受的数据完全符合RRD中数据源的定义次序。如果需要自己指定其接受的数据及与数据源对应的次序，则可以使用--template选项来实现。注意，不要为COMPUTE类型的数据源指定要更新的数据。
+--daemon address: 如果使用此选项，则意味着RRDTool将试图从指定的caching daemon接收更新数据。
+N|timestamp:value[:value...]：用于指定向RRD提供的数据更新所产生的时间，这个可以是timestamp类型的数据，也可用N表示使用系统当前时间。负值则表示以当前时间为基准向前退回的时间点；而使用负值时，选项和数据之间必须使用--隔开，否则时间将会被解析为选项。而value部分则是向DS提供的更新数据，这些数据的次序要跟RRA中的数据源资源保持一致。如果某特定数据源没有产生新的数据，则用U来标识。多个数据源的值之间使用冒号隔开。
+
+2.5 rrdtool graph用法
+
+rrdtool graph|graphv filename [option ...] [data definition ...] [data calculation ...] [variable definition ...] [graph element ...] [print element ...]
+
+rrdtool graph基于一个或多个data definition收集所需要数据实现绘图，而这些data definition可以来自一个或多个RRD数据文件。如果想通过graph显示平均值、最大值、百分比值等，则最好通过使用variable definition语句实现。同时，从RRA中取得的数值已经进行聚合，因此，其在图形中仅表现为一个像素点。
+然而，有时候从RRA中取得数据未必如期望展示的那样，比如以byte为单位收集的数据，而展示时想以bit为单位。此时则可以使用data calculation来实现此种转换，这种转换过程要通过RPN命令来实现。
+
+2.5.1 语法解析
+
+filename: graph命令生成的图像的路径和文件名，文件名一般以.png、.svg或.eps为后缀；如果文件名使用-，则表示图像直接发往标准输出。
+
+[-s|--start time] [-e|--end time] [-S|--step seconds] ：	start和end用于指定显示图像用到的数据所来自的时间序列范围，默认为前1天至此刻的时间跨度，这也是具有最好解析度的时间跨度。start和end接受多种时间格式为其值。默认情况下，rrdtool graph会计算在指定的时间跨度内1个像素所对应的时间长度，并以之为解析度从RRA中获取数据；而step选项则可以让用户指定使用的解析度，比如，如果想以一个小时的时长为解析度，则可以为step指定3600这个值。当然，如果指定的解析度小于一个像素则会被忽略。
+
+[-t|--title string] [-v|--vertical-label string]：title用于指定图像上方的标题，而vertical-label则可以指定纵轴的标题。
+
+[-w|--width pixels] [-h|--height pixels] [-j|--only-graph] [-D|--full-size-mode]：
+width和height用于指定画布的大小，默认为400X100。如果使用full-size-mode，则图像大小会自适应进行变化。如果使用only-graph选项，并且指定的height的值小于32，则图像会被保存为微型图像，即预览图。
+
+[-u|--upper-limit value] [-l|--lower-limit value] [-r|--rigid]：
+默认情况下，图像会自动调整其纵轴的刻度，以适应展示所有的可能值。当然，可以在命令中使用upper-limit指定其能展示的最大值，lower-limit指定其能表现的最小值；根据实际数据大小，指定了upper-limit和lower-limit后图像依然会进行自适应，除了使用rigid选项进行限定。
+
+[-A|--alt-autoscale]：有时使用默认的算法来实现纵轴自适应的功能不能予以满足，alt-autoscale选项则可以通过自动调整其能够表现的最大值和最小值避免此种情况的出现。如果仅想自动调整所表现的最大值，则可以使用alt-autoscale-max，仅想自动调整其能表现的最小值，则使用alt-autoscale-min。
+
+2.5.1.1  Data and variables有三种格式：
+DEF:vname=rrdfile:ds-name:CF[:step=step][:start=time][:end=time]
+CDEF:vname=RPN expression
+VDEF:vname=RPN expression
+
+在正常的图形展示中，至少需要一个DEF和一个LINE, AREA, GPRINT或PRINT四者之一的语句。上面的这三种语句都可以从RRD文件中获取数据，甚至还可以对获取到的数据针对实际需要进行换算或调整。如果需要将获取到的数据进行换算或调整，可以通过定义变量来进行。
+
+变量名称只能包括字母、数据和-和_，而且其最大长度不能超过255个。
+
+DEF:<vname>=<rrdfile>:<ds-name>:<CF>[:step=<step>][:start=<time>][:end=<time>][:reduce=<CF>]
+这个命令能够从RRD中取得数据，而vname所保存的值可以在整个脚本中使用。默认情况下，在一个正确的解析度上保存了正确统计值的RRA将被选用，当然，也可以使用--step选项改变默认的解析度。而--step指定的解析度还可以被此命令中的step指定的值所覆盖。此处的时间跨度跟rrdtool graph的命令所使用的跨度相同，然后也可以在此处为start和end指定一个具体的值来覆盖命令中的跨度。但是，在时间中所使用的冒号必须要进行转义。
+如果数据的解析度高于图像的解析度，数据将会被进一步聚合以适应图像的解析度，这使得图形展示的能力大于实际时间跨度。然而，理想情况下，一个像素对应RRA文件中的一个CDP(Consolidate Data Point)是最好的。比如，以3600秒为解析度，那么一个宽度为400的图像所能够展示的时间跨度为400*3600秒，即400个小时。
+
+2.5.1.2  定义图像
+
+LINE[width]:value[#color][:[legend][:STACK]][:dashes[=on_s[,off_s[,on_s,off_s]...]][:dash-offset=offset]]
+绘制线形图，width用于指定线条条的宽度，可以是个浮点数。颜色使用三组两位16进制的数字分别表示红色、绿色和蓝色值。如果不指定颜色，线条将不可见。value可以是来自于DEF、VDEF或CDEF变量的值。legend为图例说明，需要指定为所需要的字符串，以表示说明此线条图代表的意义。STACK选项用于跟其它线形图或区域图共同展示时处于最上方。
+
+AREA:value[#color][:[legend][:STACK]]
+除了图形为面积图外，其中的选项的用法与LINE一致。
+
+VRULE:time#color[:legend][:dashes[=on_s[,off_s[,on_s,off_s]...]][:dash-offset=offset]]
+在某时间点绘制一条垂直线。此时间值只能是来自于VDEF的数值或变量。
+
+HRULE:value#color[:legend][:dashes[=on_s[,off_s[,on_s,off_s]...]][:dash-offset=offset]]
+在某值处绘制一条水平线。其绘制出的样子类似于LINE，但对图像的自适应没有影响，即如果指定的水平线所处的值位于图像之外，其将不可见。
+
+2.5.1.3 VDEF
+
+VDEF:vname=RPN expression
+此命令用于根据RPN语句返回一个值或一个时间。
+
+2.5.1.4 CDEF
+
+CDEF:vname=RPN expression
+此命令用于在一个或多个数据序列之外创建一个新的数据点集合(在内存中完成)，则RPN指令用于在这些数据点上以某数学函数进行求值，并将结果保存至vname中。例如CDEF:mydatabits=mydata,8,*
+
+2.5.1.5 GPRINT:vname:format[:strftime]
+strftime中的时间值只能来自于VDEF。format中的字符会原样输出，除了%引导的格式符。
+
+
+
+二、安装cacti
+
+前提：需要事先配置好的LNMP或LAMP平台，并且如果是编译安装，要求php在configure时指定了--enable-sockets选项，否则,cacti将无法运行。
+
+本文档中，操作系统平台为RHEL5.8，使用到的程序如下：
+cacti-0.8.8a (安装路径：/web/vhosts/cacti)
+httpd-2.4.2 (安装路径：/usr/local/apache)
+php-5.4.4 (安装路径：/usr/local/php)
+MySQL-5.5.24 (安装路径：/usr/local/mysql)
+rrdtool-1.4.7
+net-snmp-5.3.2.2
+
+同时，在LAMP平台上，专门为cacti准备了一个虚拟主机cacti.magedu.com，其配置如下：
+<VirtualHost *:80>
+    ServerName cacti.magedu.com
+    DocumentRoot /web/vhosts/cacti
+    <Directory "/web/vhosts/cacti">
+        Options Indexes
+        AllowOverride none
+        Require all granted
+    </Directory>
+    ErrorLog "logs/cacti-error_log"
+    CustomLog "logs/cacti-access_log" common
+</VirtualHost>
+
+1、编译安装LAMP
+
+这里不再给出安装过程，请参见另外的文档。
+
+2、net-snmp
+
+2.1 安装
+由于本机即是监控端(NMS)，又是被监控端，因此我们这里直接通过yum安装net-snmp和net-snmp-utils
+# yum -y install net-snmp net-snmp-utils
+
+2.2 配置
+编辑/etc/snmp/snmpd.conf，修改如下行中的default为你允许对当前主机进行监控的NMS主机的地址来源，可以是IP，也可以是网络地址；修改public为你需要的community(即你需要的密码串)：
+com2sec notConfigUser  default       public
+
+比如，我们这里修改为如下(保留了原密码串public，并只允许来自127.0.0.1的主机通过snmp对本机进行管理)：
+com2sec notConfigUser  127.0.0.1       public
+
+2.3 启动服务
+# service snmpd start
+# chkconfig snmpd on
+
+使用如下命令进行测试：
+# snmpwalk -v 2c -c public localhost system
+
+如果有正常监控信息输出即为OK。
+
+3、安装rrdtool
+# tar xf rrdtool-1.4.7.tar.gz
+# cd rrdtool-1.4.7
+# ./configure
+# make
+# make install
+
+4、安装cacti
+
+4.1 安装 
+# tar xf cacti-0.8.8a.tar.gz -C /web/vhosts
+# ln -sv /web/vhosts/cacti-0.8.8a /web/vhosts/cacti
+
+4.2 初始配置：
+为cacti创建数据库，并初始化所需要表：
+# mysqladmin -uroot -p create cactidb
+# cd /web/vhosts/cacti
+# mysql -uroot -p cactidb < cacti.sql
+
+创建mysql用户，使用cacti能访问其cactidb数据库(请将123456改为你所需要的密码):
+# mysql -uroot -p -e "GRANT ALL ON cactidb.* TO cactiuser@localhost IDENTIFIED BY '123456'";
+# mysqladmin -uroot -p flush-privileges
+
+接着创建系统用户cactiuser，以之运行cacti的数据获取和日志记录等工作
+# useradd cactiuser
+# chown -R cactiuser:cactiuser /web/vhosts/cacti/{log,rra}
+
+以cactiuser用户的身份，每5钟获取一次数据：
+# echo '*/5 * * * *  /usr/local/php/bin/php /web/vhosts/cacti/poller.php &> /dev/null' > /var/spool/cron/cactiuser
+
+编辑cacti的配置文件include/config.php，将数据库连接的配置等修改为前面的步骤中设置的信息：
+$database_type = "mysql";
+$database_default = "cactidb";
+$database_hostname = "localhost";
+$database_username = "cactiuser";
+$database_password = "123456";
+$database_port = "3306";
+$database_ssl = false;
+
+并实际访问cacti的URL路径，启用并修改如下行：
+//$url_path = "/cacti/";
+我们这里将之修改为：
+$url_path = "/";
+
+而后在浏览器中打开http://cacti.magedu.com/install，按提示一步步配置即可完成安装。
+
+
+
+
+
+补充材料
+
+一、数据收集
+
+1、collection methods简介
+
+Data input methods 是基本的数据收集工具，其通常是一个外部脚本、简单的SNMP查询或其它任意可以抓取非索引数据的组件。如果想实现对于cacti正在运行的本机进行监控，使用脚本即可以实现；但如果对于远程主机进行监控，通常要基于SNMP来实现或利用SSH在远程主机运行脚本收集数据来进行。
+
+与Data input methods相反，Data queries 则是用于那些可被索引数据的，比如交换机接口流量相关的数据通常是基于索引关联至某特定接口的。因此，Data queries通常用于复杂数据。
+
+2、创建Data input methods
+
+这里说明如果基于SSH，通过在远程主机上运行脚本的方式进行数据收集。
+
+
+二、模板
+
+1、数据模板(Data templates)
+
+数据模板用于描述Cacti将数据存储于RRD文件中的方式，其存储通常使用rrdtool create命令进行。
+
+Cacti通常使用rrdtool create命令将数据存储于RRD文件中，这也是cacti存储数据的最基本方式。而数据以何种结构或形式保存于RRD文件中，则需要用数据模板(Data templates)来定义。需要注意的是，一旦使用某数据模板创建了RRD文件后再改用别的数据模板，原有的数据则仍保持为原来的模板定义的格式不变。
+
+2、数据收集方法(Data input methods)
+
+通常，收集某监控对象或资源相关指标数据的方法有多种方式，如基于SNMP协议或自定义脚本等；而数据收集方法则正是用于描述Cacti收集数据并将其存储至“数据源（通常是RRD文件）”文件中的不同方式。事实上，数据模板就是基于“数据收集方法”创建的。
+
+3、数据查询(Data queries)
+
+数据查询是用于收集索引数据的方式，如收集一个路由器设备上的所有接口的流量数据或某操作系统上运行的进程的相关信息等。它通常是一个XML文件，文件中定义了要收集数据的对象(如路由器接口)及针对此对象收集数据的方法。因此，数据查询是一种比“数据收集方法”更复杂的数据收集方式。
+
+4、图像模板(Graph templates)
+
+rrdtool graph命令基于RRD文件进行图像绘制，可以基于时间序列绘制曲线(line)图、面积(area)图等来展示数据走势。图像模板即是关联于某RRD文件上的事先定义好的rrd graph命令，它确定了图形的最终显示。这也意味着，修改图像模板，所有基于此模拟的图形都会随机而改变。
+
+5、主机模板(Host templates)
+
+主机模板即预定义的关联至某特定类型被监制设备的所有图像模板和数据查询，当需要监控此类设备时，直接将主机模板应用至此设备上即可快速实现对其进行监控。
+
+三、监控网络或服务器设备
+
+1、网络设备
+
+大多数据网络设备都支持SNMP协议，而且支持众多的监控指标，如接口流量、CPU使用率等。因此，现实中此类设备的监控通常通过SNMP协议进行。安全起见，通常需要配置监控设备的SNMP功能的ACL以实现仅将监控信息输出给指定的合法监控端。
+
+2、Linux主机
+
+Linux系统可利用net-snmp等提供对SNMP协议的支持，并可实现通过SNMP输出本机的网络流量数据、系统资源利用率等。因此，对Linux主机的监控也可基于SNMP实现。此外，也可以通过在Linux主机上运行脚本并基于SSH将执行结果收集的数据传递给cacti端的数据收集脚本来实现对Linux主机的监控。
+
+3、Windows主机
+
+对Windows主机的监控可以通过SNMP协议或WMI来实现。WMI为应用程序提供了一个统一的接口，用于输出性能统计数据等，因此，使用WMI监控Windows是一种更便捷的方式。可以到http://forums.cacti.net/viewtopic.php?f=12&t=30438下载cacti WMI，并基于svn checkout http://dev.zenoss.org/svn/trunk/wmi/Samba/source获取wmic命令以实现在cacti端与cacti WMI通信。
+
+
+四、cacti插件
+
+Cacti插件体系能够让程序员在不改变Cacti核心代码的情况下为cacti开发附加功能，并且能够在不影响cacti运行的前提下为其添加安全补丁，而且也能够让终端用户为Cacti添加其需要但cacti核心缺失的功能。
+
+1、插件特性
+
+	增强的用户接口
+	访问Cacti数据库
+	管理RRD文件
+	增进的缓存和增强的性能
+	附加的新功能，如统计报告、日志和阈值监控等
+	
+2、常见的插件
+
+	MAC Track插件 —— 用于记录设备接口相关的MAC、IP等信息；
+	Network WeatherMap —— 用于在Cacti中创建网络设备间连接关系图，并能在图像中简单展现其性能指标，具体请参照：http://forums.cacti.net/viewtopic.php?t=24433；
+	Thold —— 阈值监控功能，并可实现“通知”功能；更进一步信息请参见：http://cactiusers.org/；
+	
+	Cacti自0.8.8版本起已经将Plugin Architechture整合进了Cacti包，不再需要额外安装。
+
+	
+	
+
+补充：
+
+以下是cacti xml hash的一些说明： 
+
+Take the following example: <hash_040018258d1c9487a6c58dd804f4a012007664> 
+The first 2 digits are the type of the template. 
+The next 4 digits are the Cacti version it was created on. 
+The next 32 digits are a random number. 
+
+
+
+SNMP:
+	1, 2c, 3
+	
+NMS-->Agent:
+	ro: public
+	rw: private
+	trap
+
+MIB, OID
+
+net-snmp:
+
+net-snmp, net-snmp-utils
+
+UDP: 161
+UDP: 162
+
+/etc/snmp
+
+view 
+
+
+# snmpwalk
+# snmpnetstat
+
+
+RRDTool:
+获取数据-->保存数据-->展示数据
+
+RRD：
+	PDP
+	RRA：CDP
+	
+RRD： DS:ds-name:DST:heartbeat:min:max
+	GAUGE
+	COUNTER
+	DERIVE
+	ABSOLUTE
+
+RRA:CF:xff:step:rows
+
+
+.rrd
+
+rrdtool update filename timestamp:data1:data2:
+
+rrdtool graph
+	-t
+	-v
+	-s
+	-e
+	
+	DEF:vname=rrdfile:ds-name:CF[:step=step]
+	
+	LINE:vname#RRGGBB:"LEGEND"
+	AREA:vname#RRGGBB:"LEGEND"
+	
+	GPRINT:vname:CF:format
+	COMMENT
+
+
+/var/www/html/cacti
+
+http://172.16.100.1/cacti/
+
+
+/web/vhosts/cacti
+
+http://cacti.magedu.com/
+
+
+
+收集方法：数据收集方法
+	数据查询：xml格式数据收集方法
+	数据输入方法：命令或者脚本
+		脚本：
+			只需要指定如何获取数据，并且获取到的数据经过处理后要按规定输出：
+				TAG:data TAG:data 
+				input:30 output:40
+
+
+
+
+
+
+
+
+
