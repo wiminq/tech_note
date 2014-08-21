@@ -1,0 +1,49 @@
+TCP state:
+
+The TIME_WAIT state is also called the 2MSL wait state. Every implementation must choose a value for the maximum segment lifetime (MSL). It is the maximum amount of time any segment can exist in the network before being discarded. We know this time limit is bounded, since TCP segments are transmitted as IP datagrams, and the IP datagram has the TTL field that limits its lifetime.
+
+Given the MSL value for an implementation, the rule is: when TCP performs an active close, and sends the final ACK, that connection must stay in the TIME_WAIT state for twice the MSL. This lets TCP resend the final ACK in case this ACK is lost (in which case the other end will time out and retransmit its final FIN).
+
+Another effect of this 2MSL wait is that while the TCP connection is in the 2MSL wait, the socket pair defining that connection (client IP address, client port number, server IP address, and server port number) cannot be reused. That connection can only be reused when the 2MSL wait is over.   
+
+   
+FIN WAIT 2 State
+
+In the FIN_WAIT_2 state we have sent our FIN and the other end has acknowledged it. Unless we have done a half-close, we are waiting for the application on the other end to recognize that it has received an end-of-file notification and close its end of the connection, which sends us a FIN. Only when the process at the other end does this close will our end move from the FIN_WAIT_2 to the TIME_WAIT state.
+
+This means our end of the connection can remain in this state forever. The other end is still in the CLOSE_WAIT state, and can remain there forever, until the application decides to issue its close.
+
+
+maximum transmission unit (MTU)
+
+
+
+Functions Performed By TCP
+	Addressing/Multiplexing
+	Connection Establishment, Management and Termination
+	Data Handling and Packaging
+	Data Transfer
+	Providing Reliability and Transmission Quality Services
+	Providing Flow Control and Congestion Avoidance Features
+
+
+
+Using A Finite State Machine to Explain Complex Protocols
+One way that computer scientists explain how a complex protocol works is through a theoretical tool called a finite state machine (FSM). An FSM attempts to describe a protocol or algorithm by considering it like a virtual ¡°machine¡± that progresses through a series of stages of operation in response to various happenings. You need to understand four essential concepts to comprehend the workings of a finite state machine:
+
+	State: The particular ¡°circumstance¡± or ¡°status¡± that describes the protocol software on a machine at a given time. 
+
+	Transition: The act of moving from one state to another. 
+
+	Event: Something that causes a transition to occur between states. 
+
+	Action: Something a device does in response to an event before it transitions to another state.
+A FSM describes the protocol by explaining all the different states the protocol can be in, the events that can occur in each state, what actions are taken in response to the events and what transitions happen as a result.The protocol usually starts in a particular beginning state when it is first run. It then follows a sequence of steps to get it into a regular operating state, and moves to other states in response to particular types of input or other circumstances. The state machine is called finite because there are only a limited number of states.
+
+
+
+TimeOut 
+	Amount of time the server will wait for certain events before failing a request
+	
+	1, When reading data from the client, the length of time to wait for a TCP packet to arrive if the read buffer is empty.
+	2, When writing data to the client, the length of time to wait for an acknowledgement of a packet if the send buffer is full.
