@@ -1,0 +1,932 @@
+
+Cluster:
+	LB, HA, HP
+	
+LB：
+	硬件：F5, BIGIP；IBM A10；Citrix NetScaler；
+	软件：LVS, HAproxy
+	L4 Switch
+	
+LVS: Linux Virtual Server
+	CIP-->VIP-->DIP-->RIP
+	
+LVS type:
+	NAT: 
+		所有节点在同一IP网络；
+		RIP是私用地址；RS网关指向DIP; 可以实现端口映射；
+		Director处理入站和出站请求；
+		
+	DR：
+		所有节点在同一物理网络；
+		RIP可以使用私有或公网地址；RS网关一定不能指向DIP；不能实现端口映射；
+		Director只处理入站请求；
+		
+	TUN：
+		
+LVS 调度方法
+	Fixed:
+		rr
+		wrr
+		dh
+		sh
+	Dynamic:
+		lc
+		wlc
+		sed
+		nq
+		lblc
+		lblcr
+		
+Overhead:
+	lc: (AcConn*256+InacConn)
+	wlc: (AcConn*256+InacConn)/weight
+	sed: (AcConn+1)/weight
+	nq:  
+	lblc:
+	lblcr
+	
+LVS: ipvsadm/ipvs
+	iptables: netfilter
+	ipvsadm: ipvs
+
+ipvsadm:
+	定义服务：
+		-A|-E
+			-t IP:PORT
+			-u IP:PORT
+			-f
+			
+			-s
+			
+		
+			
+	ipvsadm -A -t|u IP:PORT [-s scheduler_method]
+	-D -t|u IP:PORT
+	
+	向服务添加RS
+		-a
+		-r RS_IP:PORT
+
+		-g:DR
+		-i:TUN
+		-m:NAT
+		
+		-w weight
+		
+	-a|-e -t|u IP:PORT -r RS_IP[:PORT] [-g|m|i] [-w weight]
+	-d -t|u IP:PORT -r RS_IP[:PORT]
+	
+		
+	查看
+		-L|l
+		-n
+		-c
+		--stats
+		--rate
+		
+	-C
+
+
+	-S: 保存服务和RS的定义至某文件中；ipvsadm-save > /path/to/file
+	-R: 将保存至文件中的服务及RS定义应用起来; ipvsadm-restore < /path/to/file
+	
+
+
+项目需要：
+某公司有多台PC服务器，配置大概是SMP(2颗CPU)、8G内存；公司原有一个论坛，部署在Windows系统上，平时高峰时期平均每秒的请求大概在20000个/秒(其中动态请求2000个左右)；原有的系统已经不堪重负，因此计划将其全部迁移至Linux平台基于LAMP或LNMP实现。经测试发现，公司的PC SERVER上配置的LAMP平台动态请求的响应能力差不多为750个/秒。
+
+现请你为此项目设计一个项目实施方案。
+
+
+F5 BigIP
+IBM A10
+Citrix Netscaler
+
+LVS:
+
+	l4 switch
+
+type:
+	NAT: -m
+	DR: -g
+	TUN: -i
+	
+Schedual method:
+	Fixed:
+		rr
+		wrr
+		dh
+		sh
+	Dynamic:
+		lc
+		wlc
+		sed
+		nq
+		lblc
+		lblcr
+		
+10 cache
+	dh, lblc, lblcr
+	
+LVS persistence
+	-p 
+	
+	PCC
+	PPC
+	PFWMC
+	
+
+
+
+Messaging/Infrastructure
+	heartbeat
+	keepalived
+	corosync/openais   (RHCS: redhat, suse)
+	ultramokey
+
+Resource Allocation
+	heartbeat v1
+	heartbeat v2: crm
+	pacemaker
+	cman
+
+Resources:
+	Resource Agent:
+		Legacy heartbeat RA
+		LSB
+		OCF
+		STONITH
+		
+heartbeat v2: (messaging+crm(v1,crm))
+heartbeat v3: pacemaker
+corosync/openais+pacemaker
+
+
+CLI: crm shell
+GUI: hb-gui, hawk(webGUI)
+
+
+
+
+
+
+RHCS: (corosync/openais+cman+WebGUI(ricci+luci))
+
+
+心跳信息传播方式：
+bcast eth0
+
+ping节点：
+不能使用集群节点;
+
+定义集群节点：
+node 
+
+
+
+
+VIP/netmask/ethercard/broadcast
+
+
+
+resource type
+	primitive
+	group
+	clone
+	master-slave
+	
+crm:
+	native
+
+
+
+
+原理简介
+
+　　组播报文的目的地址使用D类IP地址， 范围是从224.0.0.0到239.255.255.255。D类地址不能出现在IP报文的源IP地址字段。单播数据传输过程中，一个数据包传输的路径是从源地址路由到目的地址，利用“逐跳”（hop-by-hop）的原理在IP网络中传输。然而在ip组播环中，数据包的目的地址不是一个，而是一组，形成组地址。所有的信息接收者都加入到一个组内，并且一旦加入之后，流向组地址的数据立即开始向接收者传输，组中的所有成员都能接收到数据包。组播组中的成员是动态的，主机可以在任何时刻加入和离开组播组。
+
+
+组播组分类
+　　组播组可以是永久的也可以是临时的。组播组地址中，有一部分由官方分配的，称为永久组播组。永久组播组保持不变的是它的ip地址，组中的成员构成可以发生变化。永久组播组中成员的数量都可以是任意的，甚至可以为零。那些没有保留下来供永久组播组使用的ip组播地址，可以被临时组播组利用。
+　　224.0.0.0～224.0.0.255为预留的组播地址（永久组地址），地址224.0.0.0保留不做分配，其它地址供路由协议使用；
+　　224.0.1.0～224.0.1.255是公用组播地址，可以用于Internet；
+　　224.0.2.0～238.255.255.255为用户可用的组播地址（临时组地址），全网范围内有效；
+　　239.0.0.0～239.255.255.255为本地管理组播地址，仅在特定的本地范围内有效。
+
+
+常用预留组播地址
+　　列表如下：
+　　224.0.0.0 基准地址（保留）
+　　224.0.0.1 所有主机的地址 （包括所有路由器地址）
+　　224.0.0.2 所有组播路由器的地址
+　　224.0.0.3 不分配
+　　224.0.0.4 dvmrp 路由器
+　　224.0.0.5 ospf 路由器
+　　224.0.0.6 ospf dr
+　　224.0.0.7 st 路由器
+　　224.0.0.8 st 主机
+　　224.0.0.9 rip-2 路由器
+　　224.0.0.10 Eigrp 路由器
+　　224.0.0.11 活动代理
+　　224.0.0.12 dhcp 服务器/中继代理
+　　224.0.0.13 所有pim 路由器
+　　224.0.0.14 rsvp 封装
+　　224.0.0.15 所有cbt 路由器
+　　224.0.0.16 指定sbm
+　　224.0.0.17 所有sbms
+　　224.0.0.18 vrrp
+　　以太网传输单播ip报文的时候，目的mac地址使用的是接收者的mac地址。但是在传输组播报文时，传输目的不再是一个具体的接收者，而是一个成员不确定的组，所以使用的是组播mac地址。组播mac地址是和组播ip地址对应的。iana（internet assigned number authority）规定，组播mac地址的高24bit为0x01005e，mac 地址的低23bit为组播ip地址的低23bit。
+　　由于ip组播地址的后28位中只有23位被映射到mac地址，这样就会有32个ip组播地址映射到同一mac地址上。
+
+
+Heartbeat+ldirectord: 
+
+
+
+作业1、基于Corosync/openais和ldirectord实现LVS(DR)中Director的高可用；主要演示RealServer为Web服务器的场景；注意配置ldirectord的fallback服务器。建议使用crm命令行进行；
+
+作业2、基于heartbeat v2和heartbeat-ldirectord实现LVS(DR)中Director的高可用； 主要演示RealServer为Web服务器的场景； 注意配置ldirectord的fallback服务器;  建议使用基于hb_gui的图形界面进行；
+
+作业3、基于Corosync/openais和NFS服务器实现MySQL的高可用；
+
+作业4、基于Corosync/openais和NFS(NAS Server)服务器实现LNMP的高可用；
+
+以上题目，要求描述清楚项目需求和规划，给出拓扑图，并写出详细实现过程。
+
+
+
+
+
+
+接下来要讲的内容：iSCSI、Nginx(Reverse Proxy, URL rewrite)、 Varnish和Squid、 NoSQL(Memcached、MongoDB)、 rpm包制作、 dialog编程、 Nagios监控、虚拟化(XEN, KVM)、系统性能评估与优化、tomcat
+
+
+
+DRBD：
+user space tools/kernel object
+Linux-2.6.33，drbd内核模块被直接整合内核源码树；
+
+Resource：
+Primary/Secondary
+
+DRBD MODE:
+Single master
+double masters
+
+Protocol A
+Protocol B
+Protocol C
+
+/dev/drbd#
+	147
+	
+
+DRBD集群：
+
+
+iSCSI，dialog, squid, tomcat，Nginx(Reverse Proxy, URL rewrite)，Nagios监控
+
+iSCSI:
+
+index.php
+
+<html>
+	<head>
+		<title>Hello</title>
+	</head>
+	<body>
+		<h1>Hello World!</h1>
+		<?php phpinfo(); ?>
+	</body>
+</html>
+
+
+表示：定义机制
+数据：定义机制
+
+CSS
+
+MVC
+
+css
+info.php
+index.html
+
+
+MVC: 表示，处理
+
+ajax, web 2.0
+
+农场：
+
+
+
+CHAP：
+target: usernamet, passwordt
+
+
+iscsi: usernamei, passwordi
+
+
+纯静态网站：html, jpg
+静态网站：php：静态化，html
+动态网站：代码+RDBMS
+
+
+Nginx, LNMP, VirtualHost, https, acl
+
+Nginx: Master
+
+./configure --prefix=/usr --sbin-path=/usr/sbin/nginx --conf-path=/etc/nginx/nginx.conf --error-log-path=/var/log/nginx/error.log --http-log-path=/var/log/nginx/access.log --pid-path=/var/run/nginx/nginx.pid  --lock-path=/var/lock/nginx.lock --user=nginx --group=nginx --with-http_ssl_module --with-http_flv_module --with-http_stub_status_module --with-http_gzip_static_module --http-client-body-temp-path=/var/tmp/nginx/client/ --http-proxy-temp-path=/var/tmp/nginx/proxy/ --http-fastcgi-temp-path=/var/tmp/nginx/fcgi/ --http-uwsgi-temp-path=/var/tmp/nginx/uwsgi --http-scgi-temp-path=/var/tmp/nginx/scgi --with-pcre=/usr
+
+
+iSCSI: 3260
+
+Openfiler
+
+反向代理与LVS不同：
+
+缓存：
+	基于磁盘，keys_zone
+	基于内存，varnish()
+	基于缓存服务器，memcached
+
+
+代理：
+	正向代理：SNAT，代理访问某互联网服务，squid, apache(mod_proxy)
+	反向代理：DNAT(LVS)
+	
+Java:
+	C： 面向过程
+	C++: 面向对象
+	Object-C:面向对象
+	
+	C，C++: 编译型，32bit, 64bit, 32bit: linux, windows, API: ABI
+	
+	C --> Java(SUN), Oak: 橡树--> Green-->Java, 1995, 1998--> JAVA 2
+	
+	一次编译，到处运行
+	
+	
+	
+	完全对象，类-->对象
+		类，自动内存管理，自动内存回收
+		Java-->bytecode(JVM)
+		
+	C程序，库(功能模块，公共功能)
+	
+	Java: 类文件，public，jar,
+
+	applet, 特殊类，库，小应用程序， java applet
+	
+	服务器端动态，CGI
+	
+	flash
+	
+	JVM，
+	
+	
+	servlet：接收用户的http请求，在本地根据用户请求运行一次，将结果生成响应报文
+	
+	.java
+	.class
+	servlet --> bytecode
+	JVM：Servlet Container, 容器
+	
+	
+	
+	servlet
+	out.println("<html>")
+	
+
+shell:
+echo hello world > a.txt
+	
+
+a.txt
+hello world
+
+
+<html>
+
+JAVA
+
+JSP: Java Server Page
+
+
+.jsp --> JSP引擎 转换为 servlet 格式源程序 --> 编译成bytecode --> 在Servlet Container中运行
+
+Servlet Container --> Web Container
+
+Web Container: servlet class --> byte --> servlet
+
+Java 2: 
+	J2SE: Java 2 Standard Edition,   JDK
+	J2EE: Enterprise Edition, JSP, EJP, JMS, JavaMail
+	J2ME: Mobile Edition
+	
+2005: Java 2 SE
+
+JVM: JDK-->JRE(Java Runtime Environment)
+
+
+Sun: JCP:
+组织，企业：
+
+JVM
+
+<html>
+	<head>
+		<title>Hello</title>
+	</head>
+	<body>
+		<h1>Hello World!</h1>
+		<% out.println("hello world!"); %>
+	</body>
+</html>
+
+
+
+Web Container: 
+	Weblogic
+	Websphere
+	Tomcat
+	Jboss
+	Resin
+	Jetty
+	JOnAS
+
+
+Reference Implimentaion: 参考实现
+Jserv
+
+Apache: 
+
+
+O'Reilly: 男猫，tomcat， SSH： Struts, Spring, Hebernate
+
+JBoss --> Tomcat
+
+JSP程序
+	公共类
+	
+	私有类
+
+
+Tomcat: 
+	/web/vhosts/tomcat/bbs, JVM
+		class loader: 装载私有类
+		
+	部署: deployment
+	停止：
+	启动：
+	反部署：
+	
+
+	
+Context: --> web.xml: 部署描述符
+
+Tomcat:
+	Server --> Service (关联一个或多个Connector至某engine)-->Engine(Container)-->Host(一个engine可以包含多个host，但要有一个默认host)-->Context(一个host内部可以有多个context，每一个context对应于一个web应用程序，而每一个web应用程序需要至少一个部署描述符文件web.xml)
+	
+
+valve: 阀门
+
+Realm: 领域
+
+
+Android: Linux内核+ADK(JVM)+	
+	
+iOS: FreeBSD+iOS
+
+
+JDK
+OpenJDK
+
+tomcat:
+实例，instance, CATALINA_BASE
+
+CATABASE_HOME
+	
+
+LAMP:
+	虚拟主机：
+	/www/htdocs/
+	/www/htdocs/bbs
+	/www/htdocs/wordpress
+
+http://www.magedu.com/bbs
+
+
+
+<%@page language="java" %>
+<html>
+	<head>
+		<title>TomcatA</title>
+	</head>
+	<body>
+		<h2><font color="red">TomcatA in www.magedu.com</font></h2>
+		<% out.println("Hello,World!"); %>
+	</body>
+</html>
+
+
+接下来要讲的内容：Varnish、 NoSQL(Memcached、MongoDB)、 rpm包制作、 Nagios监控、虚拟化(XEN, KVM)、系统性能评估与优化
+
+
+
+局部性：data, 
+10byte, 1K
+
+
+
+Direct mapped
+Set associative
+Fully associative
+
+
+
+
+上下文，用到CPU
+
+
+播放器：500s
+编辑器: 5s
+优先级高
+
+
+
+
+
+
+进程优先级：
+
+内核线程：进程调度、
+
+
+100-139：静态优先级，动态优先级
+	nice: -20-19,
+		0: 120 --> 115--> 110-->95
+		
+
+
+CPU bound
+IO bound		
+
+调度策略: SCHED_OTHER, SCHED_NORMAL
+		  CFS: Completely Fair Scheduler
+
+nice 或 renice
+		  
+		  
+1-99：实时优先级
+	内核线程
+
+SCHED_RR
+SCHED_FIFO
+
+SCHED_FIFO
+chrt -f [1-99] /path/to/program 	
+	
+SCHED_RR
+chrt -r [1-99] /path/to/program 
+
+
+
+
+
+
+ps -eo state,uid,pid,ppid,rtprio,time,comm
+
+
+
+-100 - -1:0-139
+99
+
+0x00000001, 0001 #0
+0x00000003, 0011, #1
+
+
+
+0x00000007, 0111 #0,#1,#2
+
+taskset -p -c  0-3
+taskset -p -c 0x00000001 
+
+
+
+1、向内核传递参数：
+isolcpus=cpu number, ...
+
+2、taskset命令将进程与隔离的CPU绑定
+taskset
+
+3、将中断与此CPU隔离
+
+
+
+调度器域：
+	cpusets
+	
+	使用虚拟文件进行
+	
+
+	
+配置根cpusets
+
+/etc/fstab
+添加一行：
+cpuset  /cpusets  cpuset 	defaults 	0 0
+
+
+/cpusets
+
+
+byrequest
+bytraffic
+bybusiness
+
+
+个人信息简介
+自我评价
+项目经历
+	项目名称，实施时间，项目描述，角色
+职业技能
+	集群，SHELL编程，mysql复制、集群，tomcat集群，优化，系统裁剪及定制，内核编译
+	LAMP, memcached, cacti和nagios， nginx
+个人特长
+	
+	
+慎独
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Minor
+If the page is loaded in memory at the time the fault is generated, but is not marked in the memory management unit as being loaded in memory, then it is called a minor or soft page fault. The page fault handler in the operating system merely needs to make the entry for that page in the memory management unit point to the page in memory and indicate that the page is loaded in memory; it does not need to read the page into memory. This could happen if the memory is shared by different programs and the page is already brought into memory for other programs. The page could also have been removed from a process's Working Set, but not yet written to disk or erased, such as in operating systems that use Secondary Page Caching. For example, HP OpenVMS may remove a page that does not need to be written to disk (if it has remained unchanged since it was last read from disk, for example) and place it on a Free Page List if the working set is deemed too large. However, the page contents are not overwritten until the page is assigned elsewhere, meaning it is still available if it is referenced by the original process before being allocated. Since these faults do not involve disk latency, they are faster and less expensive than major page faults.
+
+Major
+If the page is not loaded in memory at the time the fault is generated, then it is called a major or hard page fault. The page fault handler in the operating system needs to find a free page in memory, or choose a page in memory to be used for this page's data, write out the data in that page if it hasn't already been written out since it was last modified, mark that page as not being loaded into memory, read the data for that page into the page, and then make the entry for that page in the memory management unit point to the page in memory and indicate that the page is loaded in memory.[clarification needed] Major faults are more expensive than minor page faults and add disk latency to the interrupted program's execution. This is the mechanism used by an operating system to increase the amount of program memory available on demand. The operating system delays loading parts of the program from disk until the program attempts to use it and the page fault is generated.
+
+
+
+
+线性地址空间
+物理地址空间
+
+OS：虚拟内存
+32bit: 4G, 1G
+32ibt: 4G, 2G
+
+内存虚拟化：
+
+NUMA:
+
+# cat /proc/<PID>/numa_maps
+
+numactl 命令
+
+cupset
+
+
+
+
+The columns show the following:
+
+r
+Shows the amount of processes in the run queue. These processes are waiting for a free CPU slot to be executed. If the number of processes in this column is constantly higher than the number of CPUs available, this is an indication for insufficient CPU power.
+
+b
+Shows the amount of processes waiting for a resource other than a CPU. A high number in this column may indicate an I/O problem (network or disk).
+
+swpd
+The amount of swap space (KB) currently used.
+
+free
+The amount of unused memory (KB).
+
+inact
+Recently unused memory that can be reclaimed. This column is only visible when calling vmstat with the parameter -a (recommended).
+
+active
+Recently used memory that normally does not get reclaimed. This column is only visible when calling vmstat with the parameter -a (recommended).
+
+buff
+File buffer cache (KB) in RAM. This column is not visible when calling vmstat with the parameter -a (recommended).
+
+cache
+Page cache (KB) in RAM. This column is not visible when calling vmstat with the parameter -a (recommended).
+
+si
+Amount of data (KB) that is moved from RAM to swap per second. High values over a longer period of time in this column are an indication that the machine would benefit from more RAM.
+
+so
+Amount of data (KB) that is moved from swap to RAM per second. High values over a longer period of time in this column are an indication that the machine would benefit from more RAM.
+
+bi
+Number of blocks per second received from a block device (e.g. a disk read). Note that swapping also impacts the values shown here.
+
+bo
+Number of blocks per second sent to a block device (e.g. a disk write). Note that swapping also impacts the values shown here.
+
+in
+Interrupts per second. A high value indicates a high I/O level (network and/or disk).
+
+cs
+Number of context switches per second. Simplified this means that the kernel has to replace executable code of one program in memory with that of another program.
+
+us
+Percentage of CPU usage from user processes.
+
+sy
+Percentage of CPU usage from system processes.
+
+id
+Percentage of CPU time spent idling. If this value is zero over a longer period of time, your CPU(s) are working to full capacity. This is not necessarily a bad sign—rather refer to the values in columns r and b to determine if your machine is equipped with sufficient CPU power.
+
+wa
+If "wa" time is non-zero, it indicates throughput lost due to waiting for I/O. This may be inevitable, for example, if a file is being read for the first time, background writeback cannot keep up, and so on. It can also be an indicator for a hardware bottleneck (network or hard disk). A last, it can indicate a potential for tuning the virtual memory manager (refer to Chapter 15, Tuning the Memory Management Subsystem).
+
+st
+Percentage of CPU time used by virtual machines.
+
+
+
+
+
+/proc/meminfo
+
+The most important entries are:
+
+MemTotal
+Total amount of usable RAM
+
+MemFree
+Total amount of unused RAM
+
+Buffers
+File buffer cache in RAM
+
+Cached
+Page cache (excluding buffer cache) in RAM
+
+SwapCached
+Page cache in swap
+
+Active
+Recently used memory that normally is not reclaimed. This value is the sum of memory claimed by anonymous pages (listed as Active(anon)) and file-backed pages (listed as Active(file))
+
+Inactive
+Recently unused memory that can be reclaimed. This value is the sum of memory claimed by anonymous pages (listed as Inactive(anon)) and file-backed pages (listed as Inactive(file)).
+
+SwapTotal
+Total amount of swap space
+
+SwapFree
+Total amount of unused swap space
+
+Dirty
+Amount of memory that will be written to disk
+
+Writeback
+Amount of memory that currently is written to disk
+
+Mapped
+Memory claimed with the nmap command
+
+Slab
+Kernel data structure cache
+
+SReclaimable
+Reclaimable slab caches (inode, dentry, etc.)
+
+Committed_AS
+An approximation of the total amount of memory (RAM plus swap) the current workload needs in the worst case.
+
+
+
+
+
+/usr/bin/time
+
+The real time that elapsed from the command's start-up until it finished.
+
+CPU time of the user as reported by the times system call.
+
+CPU time of the system as reported by the times system call.
+
+
+vm.nr_hugepages=
+
+
+
+回收内存：
+
+1: page cache
+2: buffer cache
+3: all
+
+
+加速写：延迟写
+
+page cache:
+
+
+pdflush:
+	vm.nr_pdflush_threads=
+	
+	vm.dirty_backgroud_ratio
+	vm.dirty_ration
+	
+	vm.dirty_expire_centisecs
+	vm.dirty_writeback_centisecs
+	
+
+# sync
+# echo s > /proc/sysrq-trigger
+
+magic system request
+
+overcommit
+
+oom: 内存耗尽
+
+
+
+
+watch –n1 ‘ps axo pid,comm,rss,vsize | grep httpd’
+
+
+
+
+ext2, ext3, ext4, xfs, jfs, reiserfs
+
+文件系统：内核模块
+
+重新编译内核：ext3
+	mkfs -t ext3 = mkfs.ext3
+
+ext3, ext3-utils
+
+xfs -- xfs-utils
+
+xfs
+
+
+
+
+18917970755
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
